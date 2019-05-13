@@ -85,3 +85,8 @@ bool Less<Literal>::operator()(Literal const& _lhs, Literal const& _rhs) const
 	else
 		return _lhs.value < _rhs.value;
 }
+
+bool SwitchCaseSorter::operator()(Case const* _lhs, Case const* _rhs) const
+{
+	return Less<Literal*>{}(_lhs->value.get(), _rhs->value.get());
+}
