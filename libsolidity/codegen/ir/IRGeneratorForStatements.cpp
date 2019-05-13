@@ -234,12 +234,68 @@ void IRGeneratorForStatements::endVisit(Return const& _return)
 
 void IRGeneratorForStatements::endVisit(UnaryOperation const& _unaryOperation)
 {
-	if (type(_unaryOperation).category() == Type::Category::RationalNumber)
+	Type const& resultType = type(_unaryOperation);
+	Token const op = _unaryOperation.getOperator();
+
+	if (resultType.category() == Type::Category::RationalNumber)
+	{
 		defineExpression(_unaryOperation) <<
-			formatNumber(type(_unaryOperation).literalValue(nullptr)) <<
+			formatNumber(resultType.literalValue(nullptr)) <<
 			"\n";
+	}
+	else if (resultType.category() == Type::Category::Integer)
+	{
+		solAssert(resultType == type(_unaryOperation.subExpression()), "Result type doesn't match!");
+
+		string modifiedValue = m_context.newYulVariable();
+
+		if (op == Token::Inc || op == Token::Dec)
+		{
+			IntegerType const& intType = *dynamic_cast<IntegerType const*>(&resultType);
+
+			solAssert(!!m_currentLValue, "LValue not retrieved.");
+			string fetchValueExpr = m_currentLValue->retrieveValue();
+			string modifiedValue = m_context.newYulVariable();
+			string originalValue = m_context.newYulVariable();
+
+			m_code <<
+				"let " << originalValue << " := " << fetchValueExpr << "\n" <<
+				"let " << modifiedValue << " := " <<
+				(op == Token::Inc ?
+					m_utils.incrementCheckedFunction(intType) :
+					m_utils.decrementCheckedFunction(intType)
+				) << "(" << originalValue << ")\n" <<
+				m_currentLValue->storeValue(modifiedValue, resultType);
+
+			defineExpression(_unaryOperation) <<
+				(_unaryOperation.isPrefixOperation() ? modifiedValue : originalValue) << "\n";
+
+			m_code << m_currentLValue->storeValue(modifiedValue, resultType);
+			m_currentLValue.reset();
+		}
+		else if (op == Token::BitNot)
+			appendSimpleUnaryOperation(_unaryOperation, _unaryOperation.subExpression());
+		else
+			solUnimplementedAssert(false, "Unary operator not yet implemented");
+	}
+	else if (resultType.category() == Type::Category::Bool)
+	{
+			string modifiedValue = m_context.newYulVariable();
+
+			appendSimpleUnaryOperation(_unaryOperation, _unaryOperation.subExpression());
+	}
 	else
-		solUnimplementedAssert(false, "");
+		solUnimplementedAssert(false, "Unary operator not yet implemented");
+}
+
+void IRGeneratorForStatements::appendSimpleUnaryOperation(UnaryOperation const& _operation, Expression const& _expr)
+{
+	string func = _operation.getOperator() == Token::Not ? "iszero" : "not";
+
+	defineExpression(_operation) <<
+		m_utils.cleanupFunction(type(_expr)) << "(" <<
+			func << "(" << m_context.variable(_expr) << ")" <<
+		")\n";
 }
 
 bool IRGeneratorForStatements::visit(BinaryOperation const& _binOp)
