@@ -21,7 +21,7 @@ defaults:
         mkdir -p build
         cd build
         [ -n "$COVERAGE" -a "$CIRCLE_BRANCH" != release -a -z "$CIRCLE_TAG" ] && CMAKE_OPTIONS="$CMAKE_OPTIONS -DCOVERAGE=ON"
-        cmake .. -DCMAKE_BUILD_TYPE=Release $CMAKE_OPTIONS -G "Unix Makefiles"
+        cmake .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-Release} $CMAKE_OPTIONS -G "Unix Makefiles"
         make -j4
 
   - run_build_ossfuzz: &run_build_ossfuzz
@@ -30,7 +30,7 @@ defaults:
         mkdir -p build
         cd build
         protoc --proto_path=../test/tools/ossfuzz yulProto.proto --cpp_out=../test/tools/ossfuzz
-        cmake .. -DCMAKE_BUILD_TYPE=Release $CMAKE_OPTIONS
+        cmake .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-Release} $CMAKE_OPTIONS
         make ossfuzz ossfuzz_proto -j4
 
   # --------------------------------------------------------------------------
@@ -96,13 +96,13 @@ defaults:
       - store_test_results: *store_test_results
       - store_artifacts: *artifacts_test_results
 
-  - test_ubuntu1810: &test_ubuntu1810
+  - test_ubuntu1904: &test_ubuntu1904
       docker:
-        - image: trapni/solc-buildpack-deps:ubuntu1810
+        - image: trapni/solc-buildpack-deps:ubuntu1904
       steps: *test_steps
 
   - test_asan: &test_asan
-      <<: *test_ubuntu1810
+      <<: *test_ubuntu1904
 
   # --------------------------------------------------------------------------
   # Workflow Templates
@@ -112,30 +112,30 @@ defaults:
         tags:
           only: /.*/
 
-  - workflow_ubuntu1810: &workflow_ubuntu1810
+  - workflow_ubuntu1904: &workflow_ubuntu1904
       <<: *workflow_trigger_on_tags
       requires:
-        - build_ubuntu1810
+        - build_ubuntu1904
 
   - workflow_osx: &workflow_osx
       <<: *workflow_trigger_on_tags
       requires:
         - build_osx
 
-  - workflow_ubuntu1810_asan: &workflow_ubuntu1810_asan
+  - workflow_ubuntu1904_asan: &workflow_ubuntu1904_asan
       <<: *workflow_trigger_on_tags
       requires:
-        - build_ubuntu1810_asan
+        - build_ubuntu1904_asan
 
   - workflow_emscripten: &workflow_emscripten
       <<: *workflow_trigger_on_tags
       requires:
         - build_emscripten
 
-  - workflow_ubuntu1810_ossfuzz: &workflow_ubuntu1810_ossfuzz
+  - workflow_ubuntu1904_ossfuzz: &workflow_ubuntu1904_ossfuzz
       <<: *workflow_trigger_on_tags
       requires:
-        - build_ubuntu1810_ossfuzz
+        - build_ubuntu1904_ossfuzz
 
 # -----------------------------------------------------------------------------------------------
 jobs:
@@ -183,27 +183,27 @@ jobs:
           name: Test buglist
           command: ./test/buglistTests.js
 
-  build_ubuntu1810: &build_ubuntu1810
+  build_ubuntu1904: &build_ubuntu1904
     docker:
-      - image: trapni/solc-buildpack-deps:ubuntu1810
+      - image: trapni/solc-buildpack-deps:ubuntu1904
     steps:
       - checkout
       - run: *run_build
       - store_artifacts: *artifacts_solc
       - persist_to_workspace: *artifacts_executables
 
-  build_ubuntu1810_codecov:
-    <<: *build_ubuntu1810
+  build_ubuntu1904_codecov:
+    <<: *build_ubuntu1904
     environment:
-      COVERAGE: "ON"
-      CMAKE_OPTIONS: -DCMAKE_BUILD_TYPE=Debug
+      COVERAGE: ON
+      CMAKE_BUILD_TYPE: Debug
     steps:
       - checkout
       - run: *run_build
       - persist_to_workspace: *artifacts_build_dir
 
-  test_ubuntu1810_codecov:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_codecov:
+    <<: *test_ubuntu1904
     environment:
       EVM: constantinople
       OPTIMIZE: 1
@@ -225,16 +225,17 @@ jobs:
 
   # Builds in C++17 mode and uses debug build in order to speed up.
   # Do *NOT* store any artifacts or workspace as we don't run tests on this build.
-  build_ubuntu1810_cxx17:
-    <<: *build_ubuntu1810
+  build_ubuntu1904_cxx17:
+    <<: *build_ubuntu1904
     environment:
-      CMAKE_OPTIONS: -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/cxx17.cmake -DUSE_CVC4=OFF -DCMAKE_BUILD_TYPE=Debug
+      CMAKE_BUILD_TYPE: Debug
+      CMAKE_OPTIONS: -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/cxx17.cmake -DUSE_CVC4=OFF
     steps:
       - checkout
       - run: *run_build
 
-  build_ubuntu1810_ossfuzz:
-    <<: *build_ubuntu1810
+  build_ubuntu1904_ossfuzz:
+    <<: *build_ubuntu1904
     environment:
       TERM: xterm
       CC: /usr/bin/clang-7
@@ -246,8 +247,8 @@ jobs:
       - run: *run_build_ossfuzz
       - persist_to_workspace: *artifacts_executables_ossfuzz
 
-  test_ubuntu1810_ossfuzz: &test_ubuntu1810_ossfuzz
-    <<: *test_ubuntu1810
+  test_ubuntu1904_ossfuzz: &test_ubuntu1904_ossfuzz
+    <<: *test_ubuntu1904
     steps:
       - checkout
       - attach_workspace:
@@ -276,7 +277,8 @@ jobs:
       xcode: "10.0.0"
     environment:
       TERM: xterm
-      CMAKE_OPTIONS: -DLLL=ON -DCMAKE_BUILD_TYPE=Debug
+      CMAKE_BUILD_TYPE: Debug
+      CMAKE_OPTIONS: -DLLL=ON
     steps:
       - checkout
       - run:
@@ -345,10 +347,11 @@ jobs:
             - version.txt
 
   # x64 ASAN build, for testing for memory related bugs
-  build_ubuntu1810_asan: &build_ubuntu1810_asan
-    <<: *build_ubuntu1810
+  build_ubuntu1904_asan: &build_ubuntu1904_asan
+    <<: *build_ubuntu1904
     environment:
-      CMAKE_OPTIONS: -DSANITIZE=address -DCMAKE_BUILD_TYPE=Debug
+      CMAKE_OPTIONS: -DSANITIZE=address
+      CMAKE_BUILD_TYPE: Debug
     steps:
       - checkout
       - run: *run_build
@@ -357,7 +360,7 @@ jobs:
 
   build_docs:
     docker:
-      - image: trapni/solc-buildpack-deps:ubuntu1810
+      - image: trapni/solc-buildpack-deps:ubuntu1904
     steps:
       - checkout
       - run: *setup_prerelease_commit_hash
@@ -368,9 +371,9 @@ jobs:
           path: docs/_build/html/
           destination: docs-html
 
-  test_ubuntu1810_cli: &test_ubuntu1810_cli
+  test_ubuntu1904_cli: &test_ubuntu1904_cli
     docker:
-      - image: trapni/solc-buildpack-deps:ubuntu1810
+      - image: trapni/solc-buildpack-deps:ubuntu1904
     environment:
       TERM: xterm
     steps:
@@ -381,66 +384,66 @@ jobs:
       - store_test_results: *store_test_results
       - store_artifacts: *artifacts_test_results
 
-  test_ubuntu1810_asan_cli:
-    <<: *test_ubuntu1810_cli
+  test_ubuntu1904_asan_cli:
+    <<: *test_ubuntu1904_cli
 
-  test_ubuntu1810_asan_constantinople:
+  test_ubuntu1904_asan_constantinople:
     <<: *test_asan
     environment:
       EVM: constantinople
       OPTIMIZE: 0
 
-  test_ubuntu1810_homestead:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_homestead:
+    <<: *test_ubuntu1904
     environment:
       EVM: homestead
       OPTIMIZE: 0
 
-  test_ubuntu1810_homestead_opt:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_homestead_opt:
+    <<: *test_ubuntu1904
     environment:
       EVM: homestead
       OPTIMIZE: 1
 
-  test_ubuntu1810_byzantium:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_byzantium:
+    <<: *test_ubuntu1904
     environment:
       EVM: byzantium
       OPTIMIZE: 0
 
-  test_ubuntu1810_byzantium_opt:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_byzantium_opt:
+    <<: *test_ubuntu1904
     environment:
       EVM: byzantium
       OPTIMIZE: 1
 
-  test_ubuntu1810_constantinople:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_constantinople:
+    <<: *test_ubuntu1904
     environment:
       EVM: constantinople
       OPTIMIZE: 0
 
-  test_ubuntu1810_constantinople_opt:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_constantinople_opt:
+    <<: *test_ubuntu1904
     environment:
       EVM: constantinople
       OPTIMIZE: 1
 
-  test_ubuntu1810_constantinople_opt_abiv2:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_constantinople_opt_abiv2:
+    <<: *test_ubuntu1904
     environment:
       EVM: constantinople
       OPTIMIZE: 1
       ABI_ENCODER_V2: 1
 
-  test_ubuntu1810_petersburg:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_petersburg:
+    <<: *test_ubuntu1904
     environment:
       EVM: petersburg
       OPTIMIZE: 0
 
-  test_ubuntu1810_petersburg_opt:
-    <<: *test_ubuntu1810
+  test_ubuntu1904_petersburg_opt:
+    <<: *test_ubuntu1904
     environment:
       EVM: petersburg
       OPTIMIZE: 1
@@ -520,34 +523,34 @@ workflows:
       # build-only
       - build_docs: *workflow_trigger_on_tags
       - build_archlinux: *workflow_trigger_on_tags
-      - build_ubuntu1810_cxx17: *workflow_trigger_on_tags
-      - build_ubuntu1810_ossfuzz: *workflow_trigger_on_tags
+      - build_ubuntu1904_cxx17: *workflow_trigger_on_tags
+      - build_ubuntu1904_ossfuzz: *workflow_trigger_on_tags
 
       # OS/X build and tests
       - build_osx: *workflow_trigger_on_tags
       - test_osx_cli: *workflow_osx
 
       # Ubuntu 18.10 build and tests
-      - build_ubuntu1810: *workflow_trigger_on_tags
-      - test_ubuntu1810_cli: *workflow_ubuntu1810
-      - test_ubuntu1810_homestead: *workflow_ubuntu1810
-      - test_ubuntu1810_homestead_opt: *workflow_ubuntu1810
-      - test_ubuntu1810_byzantium: *workflow_ubuntu1810
-      - test_ubuntu1810_byzantium_opt: *workflow_ubuntu1810
-      - test_ubuntu1810_constantinople: *workflow_ubuntu1810
-      - test_ubuntu1810_constantinople_opt: *workflow_ubuntu1810
-      - test_ubuntu1810_constantinople_opt_abiv2: *workflow_ubuntu1810
-      - test_ubuntu1810_petersburg: *workflow_ubuntu1810
-      - test_ubuntu1810_petersburg_opt: *workflow_ubuntu1810
+      - build_ubuntu1904: *workflow_trigger_on_tags
+      - test_ubuntu1904_cli: *workflow_ubuntu1904
+      - test_ubuntu1904_homestead: *workflow_ubuntu1904
+      - test_ubuntu1904_homestead_opt: *workflow_ubuntu1904
+      - test_ubuntu1904_byzantium: *workflow_ubuntu1904
+      - test_ubuntu1904_byzantium_opt: *workflow_ubuntu1904
+      - test_ubuntu1904_constantinople: *workflow_ubuntu1904
+      - test_ubuntu1904_constantinople_opt: *workflow_ubuntu1904
+      - test_ubuntu1904_constantinople_opt_abiv2: *workflow_ubuntu1904
+      - test_ubuntu1904_petersburg: *workflow_ubuntu1904
+      - test_ubuntu1904_petersburg_opt: *workflow_ubuntu1904
 
       # Code Coverage enabled build and tests
-      - build_ubuntu1810_codecov: *workflow_trigger_on_tags
-      - test_ubuntu1810_codecov: *workflow_ubuntu1810
+      - build_ubuntu1904_codecov: *workflow_trigger_on_tags
+      - test_ubuntu1904_codecov: *workflow_ubuntu1904
 
       # ASan build and tests
-      - build_ubuntu1810_asan: *workflow_trigger_on_tags
-      - test_ubuntu1810_asan_constantinople: *workflow_ubuntu1810_asan
-      - test_ubuntu1810_asan_cli: *workflow_ubuntu1810_asan
+      - build_ubuntu1904_asan: *workflow_trigger_on_tags
+      - test_ubuntu1904_asan_constantinople: *workflow_ubuntu1904_asan
+      - test_ubuntu1904_asan_cli: *workflow_ubuntu1904_asan
 
       # Emscripten build and selected tests
       - build_emscripten: *workflow_trigger_on_tags
@@ -571,6 +574,6 @@ workflows:
       - test_emscripten_external_colony: *workflow_emscripten
 
       # OSSFUZZ builds and (regression) tests
-      - build_ubuntu1810_ossfuzz: *workflow_trigger_on_tags
-      - test_ubuntu1810_ossfuzz: *workflow_ubuntu1810_ossfuzz
+      - build_ubuntu1904_ossfuzz: *workflow_trigger_on_tags
+      - test_ubuntu1904_ossfuzz: *workflow_ubuntu1904_ossfuzz
 
