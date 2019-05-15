@@ -558,7 +558,7 @@ void TestFileParser::Scanner::scanNextToken()
 			else if (isWhiteSpace(current()))
 				token = selectToken(Token::Whitespace);
 			else if (isEndOfLine())
-				token = selectToken(Token::EOS);
+				token = make_pair(Token::EOS, "EOS");
 			else
 				throw Error(
 					Error::Type::ParserError,
