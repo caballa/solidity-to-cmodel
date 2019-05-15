@@ -543,10 +543,6 @@ workflows:
       - test_ubuntu1904_petersburg: *workflow_ubuntu1904
       - test_ubuntu1904_petersburg_opt: *workflow_ubuntu1904
 
-      # Code Coverage enabled build and tests
-      - build_ubuntu1904_codecov: *workflow_trigger_on_tags
-      - test_ubuntu1904_codecov: *workflow_ubuntu1904
-
       # ASan build and tests
       - build_ubuntu1904_asan: *workflow_trigger_on_tags
       - test_ubuntu1904_asan_constantinople: *workflow_ubuntu1904_asan
@@ -576,4 +572,8 @@ workflows:
       # OSSFUZZ builds and (regression) tests
       - build_ubuntu1904_ossfuzz: *workflow_trigger_on_tags
       - test_ubuntu1904_ossfuzz: *workflow_ubuntu1904_ossfuzz
+
+      # Code Coverage enabled build and tests
+      - build_ubuntu1904_codecov: *workflow_trigger_on_tags
+      - test_ubuntu1904_codecov: *workflow_ubuntu1904
 
